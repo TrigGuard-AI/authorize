@@ -51165,6 +51165,8 @@ async function getCloudRunIdentityTokenFromOidc(opts) {
   const join = requestUrl.includes("?") ? "&" : "?";
   const credentialSourceUrl = `${requestUrl}${join}audience=${encodeURIComponent(oidcAudience)}`;
 
+  // Federated STS token only (no generateAccessToken impersonation). The WIF principal
+  // must have roles/iam.serviceAccountTokenCreator on the target SA to call generateIdToken.
   const credentialJson = {
     type: "external_account",
     audience: `//iam.googleapis.com/${workloadIdentityProvider}`,
@@ -51180,7 +51182,6 @@ async function getCloudRunIdentityTokenFromOidc(opts) {
         subject_token_field_name: "value",
       },
     },
-    service_account_impersonation_url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${serviceAccountEmail}:generateAccessToken`,
   };
 
   const client = ExternalAccountClient.fromJSON(credentialJson);
