@@ -26,8 +26,14 @@ inputs:
   actorId:
     description: "Alias for actor_id (legacy)"
     required: false
+  workload_identity_provider:
+    description: "GCP WIF provider resource id (projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/providers/PROVIDER_ID). Use with service_account for OIDC (no static secret)."
+    required: false
+  service_account:
+    description: "GCP service account email to impersonate (must have roles/run.invoker on the gateway). Use with workload_identity_provider."
+    required: false
   authToken:
-    description: "Bearer token if the authority requires auth."
+    description: "Legacy static bearer (e.g. TRIGGUARD_CLOUD_TOKEN). Prefer workload_identity_provider + service_account."
     required: false
 
 runs:

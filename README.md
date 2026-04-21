@@ -30,7 +30,17 @@ Older examples may reference a different GitHub namespace — the only supported
 | `authorityUrl` | One of these | Legacy alias for `gateway_url`. |
 | `actor_id` | No | Actor identifier (default: `github-actions`). |
 | `actorId` | No | Legacy alias for `actor_id`. |
-| `authToken` | No | Bearer token if the gateway requires authentication. |
+| `workload_identity_provider` | OIDC path | GCP WIF provider resource id (`projects/.../providers/...`). Use with `service_account`. |
+| `service_account` | OIDC path | GCP service account email (`roles/run.invoker` on the gateway). |
+| `authToken` | No | Legacy static bearer; prefer OIDC for CI. |
+
+### Cloud Run + GitHub OIDC (recommended)
+
+1. In GCP, create a **Workload Identity Federation** pool + GitHub OIDC provider, bind a **service account** with `roles/run.invoker` on the Cloud Run service, and grant `roles/iam.workloadIdentityUser` to the GitHub principal (`principalSet` for your org/repo). See `packages/trigguard-cloud/scripts/setup-github-wif.sh` in the TrigGuard monorepo.
+2. In the workflow job, set **`permissions: { id-token: write, contents: read }`** so the runner can mint an OIDC JWT.
+3. Pass **`workload_identity_provider`** and **`service_account`** to this action (no `TRIGGUARD_CLOUD_TOKEN`).
+
+The action exchanges the GitHub OIDC token for a **Google identity token** for the Cloud Run URL, then calls `POST /execute` and `GET /.well-known/trigguard/keys.json` with the same token.
 
 ## Example workflow
 
@@ -40,6 +50,9 @@ name: Deploy
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -48,7 +61,8 @@ jobs:
         with:
           surface: deploy.release
           gateway_url: https://YOUR-CLOUD-RUN-URL.run.app
-          authToken: ${{ secrets.TRIGGUARD_CLOUD_TOKEN }}
+          workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/providers/PROVIDER_ID
+          service_account: your-invoker@YOUR_PROJECT.iam.gserviceaccount.com
 
       - name: Deploy
         run: ./deploy.sh
