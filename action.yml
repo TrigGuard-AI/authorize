@@ -2,6 +2,10 @@ name: "TrigGuard Authorization"
 description: "Authorize execution surfaces with TrigGuard. One-step install; verifies receipt locally."
 author: "TrigGuard-AI"
 
+branding:
+  icon: shield
+  color: blue
+
 inputs:
   surface:
     description: "Execution surface (e.g. deploy.release, database.migrate)"
