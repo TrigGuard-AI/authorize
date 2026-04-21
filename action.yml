@@ -1,0 +1,31 @@
+name: "TrigGuard Authorization"
+description: "Authorize execution surfaces with TrigGuard. One-step install; verifies receipt locally."
+author: "TrigGuard-AI"
+
+inputs:
+  surface:
+    description: "Execution surface (e.g. deploy.release, database.migrate)"
+    required: true
+  gateway_url:
+    description: "Execution gateway base URL (staging or production). Same as endpoint/authorityUrl."
+    required: false
+  endpoint:
+    description: "Alias for gateway_url (legacy)"
+    required: false
+  authorityUrl:
+    description: "Alias for gateway_url (legacy)"
+    required: false
+  actor_id:
+    description: "Actor identifier (maps to gateway actorId)"
+    required: false
+    default: "github-actions"
+  actorId:
+    description: "Alias for actor_id (legacy)"
+    required: false
+  authToken:
+    description: "Bearer token if the authority requires auth."
+    required: false
+
+runs:
+  using: "node20"
+  main: "dist/index.js"

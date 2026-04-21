@@ -1,0 +1,21 @@
+# Minimal example: call the staging execution gateway with a bearer token.
+# In the standalone TrigGuard-AI/authorize repo this file lives at .github/workflows/trigguard.yml.
+# Add repo secret TRIGGUARD_CLOUD_TOKEN (identity token or SA-backed token with run.invoker).
+
+name: TrigGuard authorize (staging gateway)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  authorize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: TrigGuard authorization
+        uses: TrigGuard-AI/authorize@v1
+        with:
+          surface: deploy.release
+          gateway_url: https://trigguard-execution-gateway-staging-386138887132.europe-west2.run.app
+          authToken: ${{ secrets.TRIGGUARD_CLOUD_TOKEN }}
