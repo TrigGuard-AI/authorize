@@ -4,6 +4,7 @@
  */
 const core = require("@actions/core");
 const { verifyReceiptWithAuthority } = require("./verify");
+const { getCloudRunIdentityTokenFromOidc } = require("./oidc-gcp");
 
 async function run() {
   try {
@@ -22,11 +23,35 @@ async function run() {
       core.setFailed("TrigGuard: provide 'gateway_url', 'endpoint', or 'authorityUrl'");
       return;
     }
-    const authToken = core.getInput("authToken") || process.env.TRIGGUARD_TOKEN || "";
+
+    const workloadIdentityProvider = (
+      core.getInput("workload_identity_provider") || ""
+    ).trim();
+    const serviceAccountEmail = (
+      core.getInput("service_account") || ""
+    ).trim();
+    const authTokenLegacy =
+      core.getInput("authToken") || process.env.TRIGGUARD_TOKEN || "";
+
+    let authToken = authTokenLegacy;
+
+    if (workloadIdentityProvider && serviceAccountEmail) {
+      core.info("TrigGuard: using GitHub OIDC → GCP identity token for Cloud Run");
+      authToken = await getCloudRunIdentityTokenFromOidc({
+        workloadIdentityProvider,
+        serviceAccountEmail,
+        gatewayBaseUrl: authorityUrl,
+      });
+    } else if (!authToken) {
+      core.setFailed(
+        "TrigGuard: set workload_identity_provider + service_account (OIDC), or provide authToken / TRIGGUARD_CLOUD_TOKEN"
+      );
+      return;
+    }
 
     const body = JSON.stringify({ surface, actorId });
     const headers = { "Content-Type": "application/json" };
-    if (authToken) headers.Authorization = `Bearer ${authToken}`;
+    headers.Authorization = `Bearer ${authToken}`;
 
     const response = await fetch(`${authorityUrl}/execute`, {
       method: "POST",
