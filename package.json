@@ -1,0 +1,15 @@
+{
+  "name": "trigguard-authorize-action",
+  "version": "1.0.0",
+  "description": "GitHub Action — TrigGuard execution authorization with local receipt verification",
+  "main": "index.js",
+  "scripts": {
+    "build": "ncc build index.js -o dist --source-map"
+  },
+  "dependencies": {
+    "@actions/core": "^1.10.0"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.3"
+  }
+}
