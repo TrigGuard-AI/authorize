@@ -108,7 +108,7 @@ The action verifies the receipt **in the runner** using the gateway’s public k
 1. From this directory: `npm ci && npm run build` (regenerates `dist/` via `@vercel/ncc`).
 2. Create or use repo **`https://github.com/TrigGuard-AI/authorize`** with these files at the repo root.
 3. Tag **`v1`** on the commit you want consumers to pin (`git tag v1 && git push origin v1`).
-4. Optional: list on GitHub Marketplace.
+4. Optional: list on GitHub Marketplace — metadata in [`marketplace.yml`](marketplace.yml); runbook [`docs/distribution/GITHUB_ACTION_MARKETPLACE.md`](../docs/distribution/GITHUB_ACTION_MARKETPLACE.md). Sync via `bash scripts/distribution/sync-authorize-action.sh`.
 
 See [docs/distribution/PUBLISH_GITHUB_ACTION.md](../docs/distribution/PUBLISH_GITHUB_ACTION.md) for the full runbook (update any paths in that doc to **`TrigGuard-AI/authorize`**).
 

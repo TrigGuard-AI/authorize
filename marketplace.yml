@@ -1,0 +1,74 @@
+# GitHub Marketplace listing metadata — TrigGuard-AI/authorize
+#
+# GitHub publishes Actions from action.yml at release time (not from this file).
+# This artifact is the checked-in source of truth for category, copy, and publish steps.
+# Runbook: docs/distribution/GITHUB_ACTION_MARKETPLACE.md
+
+version: 1
+
+repository: TrigGuard-AI/authorize
+consumer_reference: TrigGuard-AI/authorize@v1
+monorepo_source: trigguard-github-action/
+
+action:
+  metadata_file: action.yml
+  name: TrigGuard Authorization
+  author: TrigGuard-AI
+  branding:
+    icon: shield
+    color: blue
+
+listing:
+  primary_category: Security
+  secondary_category: Deployment
+  tagline: Authorize irreversible CI/CD actions with cryptographic receipts
+  short_description: >
+    Gate deploys, migrations, and other irreversible workflow steps through TrigGuard.
+    Calls POST /execute, verifies signed receipts locally, and supports OBSERVE rollout mode.
+  keywords:
+    - authorization
+    - security
+    - deployment
+    - governance
+    - ci-cd
+    - receipts
+    - policy
+    - observe-mode
+
+release:
+  tag: v1
+  publish_to_marketplace: true
+  notes: >
+    Pin consumers to TrigGuard-AI/authorize@v1. Sync from monorepo trigguard-github-action/
+    before tagging. Requires org admin to accept GitHub Marketplace Developer Agreement once.
+
+prerequisites:
+  - Public repo with a single root action.yml (no .github/workflows in publish repo)
+  - Unique action name (must not collide with GitHub features or Marketplace categories)
+  - GCP Workload Identity Federation or bearer token for gateway auth (see README)
+
+example_usage: |
+  - uses: TrigGuard-AI/authorize@v1
+    with:
+      surface: deploy.release
+      gateway_url: https://api.trigguardai.com
+      workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
+      service_account: invoker@PROJECT.iam.gserviceaccount.com
+      repository: ${{ github.repository }}
+      branch: ${{ github.ref_name }}
+
+observe_rollout_example: |
+  - uses: TrigGuard-AI/authorize@v1
+    with:
+      surface: deploy.release
+      gateway_url: https://api.trigguardai.com
+      execution_mode: observe
+      repository: ${{ github.repository }}
+
+publish_checklist:
+  - Accept GitHub Marketplace Developer Agreement (org Settings → Developer settings → Marketplace)
+  - Sync monorepo trigguard-github-action/ to TrigGuard-AI/authorize main
+  - Draft release from tag v1 on action.yml banner → Publish to GitHub Marketplace
+  - Select primary category Security and secondary Deployment
+  - Verify "Everything looks good!" on action.yml metadata validation
+  - Update docs-site and Integration Registry with Marketplace URL after publish
