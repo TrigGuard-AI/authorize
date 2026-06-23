@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: TrigGuard product support
+    url: https://trigguardai.com
+    about: Account, gateway, and policy questions
+  - name: Security report
+    url: https://github.com/TrigGuard-AI/authorize/blob/main/SECURITY.md
+    about: Report vulnerabilities privately

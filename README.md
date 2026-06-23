@@ -1,53 +1,96 @@
-# TrigGuard — GitHub Actions
+# TrigGuard Authorization
 
-## Decision gate (Phase 12)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-TrigGuard_Authorization-blue?logo=github)](https://github.com/marketplace/actions/trigguard-authorization)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-**[`decision-gate/`](decision-gate/)** — **`TrigGuard Authorization Gate`**: calls Phase 10 **`sdk/node`** **`authorize()`** (decision endpoint). Fails the job unless **`decision === "PERMIT"`**. No policy logic in the action. See **`decision-gate/README.md`** and **`docs/integrations/GITHUB_ACTIONS_GATE.md`**.
-
----
-
-## Execution authorize (receipt / `POST /execute`)
-
-Authorize irreversible execution using the TrigGuard protocol. The action calls your execution gateway at **`authorityUrl/execute`**, **verifies the receipt locally** (so a compromised server or MITM cannot forge PERMIT), and fails the workflow if the receipt is invalid or the decision is not PERMIT.
-
-## Target distribution
-
-**Publish as:** `TrigGuard-AI/authorize`  
-**Consumer usage:**
+**Gate deploys, migrations, and other irreversible CI steps** with TrigGuard. This action calls your TrigGuard execution gateway, receives a **signed cryptographic receipt**, and **verifies the signature on the runner** — so a compromised server cannot forge approval.
 
 ```yaml
 - uses: TrigGuard-AI/authorize@v1
+  with:
+    surface: deploy.release
+    gateway_url: https://api.trigguardai.com
+    repository: ${{ github.repository }}
 ```
 
-Older examples may reference a different GitHub namespace — the only supported consumer path is **`TrigGuard-AI/authorize@v1`**.
+[Install from GitHub Marketplace](https://github.com/marketplace/actions/trigguard-authorization) · [Documentation](https://trigguardai.com) · [Report a bug](https://github.com/TrigGuard-AI/authorize/issues)
 
-## Flow
+---
 
-1. **Request** — POST to `gateway_url/execute` with `surface` and `actorId` (camelCase in JSON). Optional **`repository`** and **`branch`** are sent as `context.repository` / `context.branch` so gateway policy can allowlist `deploy.release` per repo.
-2. **Receipt** — Response includes a signed receipt.
-3. **Verify** — Action fetches `gateway_url/.well-known/trigguard/keys.json` and verifies the signature over `receiptHash`.
-4. **Continue** — If verification passes and `decision === "PERMIT"`, the step succeeds; otherwise the workflow fails.
+## How it works
 
-## Inputs
+1. **Authorize** — `POST /execute` with your execution surface (e.g. `deploy.release`).
+2. **Receipt** — Gateway returns a signed receipt bound to the decision.
+3. **Verify locally** — Action fetches `/.well-known/trigguard/keys.json` and verifies the signature before your workflow continues.
+4. **Fail closed** — Invalid receipts or non-`PERMIT` decisions fail the job (unless you use observe mode during rollout).
 
-| Input | Required | Description |
-|-------|----------|-------------|
-| `surface` | Yes | Execution surface (e.g. `deploy.release`, `database.migrate`). |
-| `gateway_url` | One of these | Execution gateway base URL (staging or `https://api.trigguardai.com` when live). |
-| `endpoint` | One of these | Legacy alias for `gateway_url`. |
-| `authorityUrl` | One of these | Legacy alias for `gateway_url`. |
-| `actor_id` | No | Actor identifier (default: `github-actions`). |
-| `actorId` | No | Legacy alias for `actor_id`. |
-| `workload_identity_provider` | OIDC path | GCP WIF provider resource id (`projects/.../providers/...`). Use with `service_account`. |
-| `service_account` | OIDC path | GCP service account email (`roles/run.invoker` on the gateway). |
-| `authToken` | No | Legacy static bearer; prefer OIDC for CI. |
-| `repository` | No | e.g. `${{ github.repository }}` — passed to gateway `context.repository` for policy. |
-| `branch` | No | e.g. `${{ github.ref_name }}` — optional `context.branch` for policy. |
-| `execution_mode` | No | `enforce` (default) or `observe` — evaluate policy without failing the workflow. Outputs `would-decision`. |
+---
 
-### Observe mode (rollout)
+## Quick start
 
-Use `execution_mode: observe` during policy rollout. The step succeeds even when policy would deny; check output `would-decision` and workflow warnings.
+```yaml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write   # required for GCP OIDC
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: TrigGuard authorization
+        uses: TrigGuard-AI/authorize@v1
+        with:
+          surface: deploy.release
+          gateway_url: https://api.trigguardai.com
+          workload_identity_provider: ${{ secrets.TRIGGUARD_WIF_PROVIDER }}
+          service_account: ${{ secrets.TRIGGUARD_SERVICE_ACCOUNT }}
+          repository: ${{ github.repository }}
+          branch: ${{ github.ref_name }}
+
+      - name: Deploy
+        run: ./deploy.sh
+```
+
+---
+
+## Authentication
+
+### Recommended: GCP Workload Identity Federation (OIDC)
+
+No long-lived secrets in GitHub. Grant your GitHub repo access to a GCP service account with `roles/run.invoker` on the gateway, then pass:
+
+| Input | Description |
+|-------|-------------|
+| `workload_identity_provider` | WIF provider resource (`projects/.../providers/...`) |
+| `service_account` | Invoker service account email |
+
+Your workflow job needs `permissions: id-token: write`.
+
+Setup guide: [TrigGuard docs — GitHub Actions](https://trigguardai.com/docs/integrations/github-actions) (contact support if you need a walkthrough).
+
+### Alternative: API key
+
+```yaml
+with:
+  gateway_url: https://api.trigguardai.com
+  authToken: ${{ secrets.TRIGGUARD_API_KEY }}
+```
+
+Prefer OIDC for production CI.
+
+---
+
+## Observe mode (policy rollout)
+
+Evaluate policy **without blocking** the pipeline while you tune rules:
 
 ```yaml
 - uses: TrigGuard-AI/authorize@v1
@@ -58,64 +101,55 @@ Use `execution_mode: observe` during policy rollout. The step succeeds even when
     repository: ${{ github.repository }}
 ```
 
+Check output **`would-decision`** — that is what enforcement would have done.
 
-1. In GCP, create a **Workload Identity Federation** pool + GitHub OIDC provider, bind a **service account** with `roles/run.invoker` on the Cloud Run service, and grant `roles/iam.workloadIdentityUser` to the GitHub principal (`principalSet` for your org/repo). See `packages/trigguard-cloud/scripts/setup-github-wif.sh` in the TrigGuard monorepo.
-2. In the workflow job, set **`permissions: { id-token: write, contents: read }`** so the runner can mint an OIDC JWT.
-3. Pass **`workload_identity_provider`** and **`service_account`** to this action (no `TRIGGUARD_CLOUD_TOKEN`).
+---
 
-The action exchanges the GitHub OIDC token for a **Google identity token** for the Cloud Run URL, then calls `POST /execute` and `GET /.well-known/trigguard/keys.json` with the same token.
+## Inputs
 
-## Example workflow
+| Input | Required | Description |
+|-------|----------|-------------|
+| `surface` | **Yes** | Execution surface (e.g. `deploy.release`, `database.migrate`). |
+| `gateway_url` | One of* | TrigGuard gateway base URL. |
+| `endpoint` | One of* | Alias for `gateway_url`. |
+| `authorityUrl` | One of* | Alias for `gateway_url`. |
+| `workload_identity_provider` | OIDC | GCP WIF provider resource id. |
+| `service_account` | OIDC | GCP service account with gateway invoker access. |
+| `authToken` | No | Bearer token (legacy; prefer OIDC). |
+| `repository` | No | `${{ github.repository }}` — for repo allowlist policies. |
+| `branch` | No | `${{ github.ref_name }}` — optional context for policy. |
+| `execution_mode` | No | `enforce` (default) or `observe`. |
+| `actor_id` / `actorId` | No | Actor id (default: `github-actions`). |
 
-```yaml
-name: Deploy
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: TrigGuard authorization
-        uses: TrigGuard-AI/authorize@v1
-        with:
-          surface: deploy.release
-          gateway_url: https://YOUR-CLOUD-RUN-URL.run.app
-          workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/providers/PROVIDER_ID
-          service_account: your-invoker@YOUR_PROJECT.iam.gserviceaccount.com
-          repository: ${{ github.repository }}
-          branch: ${{ github.ref_name }}
-
-      - name: Deploy
-        run: ./deploy.sh
-```
+\*Provide one of `gateway_url`, `endpoint`, or `authorityUrl`.
 
 ## Outputs
 
-- `decision` — TrigGuard decision (e.g. PERMIT).
-- `execution-id` — Execution ID from the receipt.
-- `receipt` — Receipt JSON string (for audit or artifacts).
+| Output | Description |
+|--------|-------------|
+| `decision` | Effective decision (`PERMIT` when the step succeeds). |
+| `would-decision` | Policy truth in observe mode (`PERMIT`, `DENY`, `SILENCE`). |
+| `execution-id` | Execution / receipt id. |
+| `execution-token` | TG-EAT JWT when issued (enforce mode). |
+| `receipt` | Full signed receipt JSON (for audit artifacts). |
 
-## Local verification
+---
 
-The action verifies the receipt **in the runner** using the gateway’s public key from `GET /.well-known/trigguard/keys.json`.
+## Security
 
-## Publishing (maintainers)
+- Receipts are verified **on the runner** using the gateway public key — not trust-on-first-use over TLS alone.
+- See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
-1. From this directory: `npm ci && npm run build` (regenerates `dist/` via `@vercel/ncc`).
-2. Create or use repo **`https://github.com/TrigGuard-AI/authorize`** with these files at the repo root.
-3. Tag **`v1`** on the commit you want consumers to pin (`git tag v1 && git push origin v1`).
-4. Optional: list on GitHub Marketplace — metadata in [`marketplace.yml`](marketplace.yml); runbook [`docs/distribution/GITHUB_ACTION_MARKETPLACE.md`](../docs/distribution/GITHUB_ACTION_MARKETPLACE.md). Sync via `bash scripts/distribution/sync-authorize-action.sh`.
+---
 
-See [docs/distribution/PUBLISH_GITHUB_ACTION.md](../docs/distribution/PUBLISH_GITHUB_ACTION.md) for the full runbook (update any paths in that doc to **`TrigGuard-AI/authorize`**).
+## Support
 
-For use **inside** the TrigGuard monorepo before publish:
+- **Issues:** [github.com/TrigGuard-AI/authorize/issues](https://github.com/TrigGuard-AI/authorize/issues)
+- **Product:** [trigguardai.com](https://trigguardai.com)
+- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md)
 
-```yaml
-- uses: ./trigguard-github-action
-```
+---
 
-Or the composite under `.github/actions/deploy-authorization` if present.
+## License
+
+[MIT](LICENSE) © TrigGuard-AI

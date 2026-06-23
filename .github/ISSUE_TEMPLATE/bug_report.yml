@@ -1,0 +1,37 @@
+name: Bug report
+description: Something is wrong with the TrigGuard Authorization action
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Do not** include API keys or receipt secrets.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What did you expect vs what occurred?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Action version
+      placeholder: "v1"
+    validations:
+      required: true
+  - type: dropdown
+    id: auth
+    attributes:
+      label: Authentication method
+      options:
+        - GCP Workload Identity (OIDC)
+        - authToken / API key
+        - Unknown
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow snippet (redact secrets)
+      description: Minimal YAML showing how you use the action
+      render: yaml
