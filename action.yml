@@ -35,6 +35,34 @@ inputs:
   authToken:
     description: "Legacy static bearer (e.g. TRIGGUARD_CLOUD_TOKEN). Prefer workload_identity_provider + service_account."
     required: false
+  repository:
+    description: "GitHub owner/repo (e.g. org/repo). Pass github.repository so policy can allowlist deploy.release per repo."
+    required: false
+  branch:
+    description: "Branch or ref name (optional). Passed in execution context for policy."
+    required: false
+  execution_mode:
+    description: "enforce (default) or observe — evaluate policy without blocking the workflow when observe."
+    required: false
+    default: "enforce"
+
+outputs:
+  decision:
+    description: "Effective authorization decision (PERMIT when the step succeeds; in observe mode this is always PERMIT)"
+  would-decision:
+    description: "Policy evaluation when execution_mode is observe (PERMIT, DENY, or SILENCE)"
+  would_decision:
+    description: "Alias for would-decision"
+  execution-token:
+    description: "TG-EAT JWT from POST /execute — pass to trigguard-verify-execution-token"
+  execution_token:
+    description: "Alias for execution-token"
+  execution-id:
+    description: "Execution ID from gateway response or receipt"
+  execution_id:
+    description: "Alias for execution-id"
+  receipt:
+    description: "JSON-serialized signed TrigGuard receipt"
 
 runs:
   using: "node20"

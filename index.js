@@ -49,7 +49,19 @@ async function run() {
       return;
     }
 
-    const body = JSON.stringify({ surface, actorId });
+    const repository = (core.getInput("repository") || "").trim();
+    const branch = (core.getInput("branch") || "").trim();
+    const executionMode = (core.getInput("execution_mode") || "enforce").trim().toLowerCase();
+    const bodyObj = { surface, actorId };
+    if (executionMode === "observe" || executionMode === "report") {
+      bodyObj.executionMode = "observe";
+    }
+    if (repository || branch) {
+      bodyObj.context = {};
+      if (repository) bodyObj.context.repository = repository;
+      if (branch) bodyObj.context.branch = branch;
+    }
+    const body = JSON.stringify(bodyObj);
     const headers = { "Content-Type": "application/json" };
     headers.Authorization = `Bearer ${authToken}`;
 
@@ -77,19 +89,50 @@ async function run() {
       return;
     }
 
-    const decision = data.receipt.decision;
-    if (decision !== "PERMIT" && decision !== "permit") {
-      core.setFailed(`TrigGuard denied execution: ${decision}`);
-      return;
+    const observe =
+      data.execution_mode === "observe" ||
+      data.executionMode === "observe" ||
+      executionMode === "observe" ||
+      executionMode === "report";
+    const wouldDecision =
+      data.would_decision ||
+      data.wouldDecision ||
+      data.receipt?.would_decision ||
+      data.receipt?.wouldDecision ||
+      data.receipt?.decision;
+    const effectiveDecision = data.decision || data.receipt?.decision;
+
+    if (observe) {
+      core.info(`TrigGuard observe mode: policy would ${wouldDecision}; workflow continues (decision=${effectiveDecision})`);
+      if (wouldDecision !== "PERMIT" && wouldDecision !== "permit") {
+        core.warning(`TrigGuard observe: would have blocked with ${wouldDecision}`);
+      }
+    } else {
+      const decision = data.receipt.decision;
+      if (decision !== "PERMIT" && decision !== "permit") {
+        core.setFailed(`TrigGuard denied execution: ${decision}`);
+        return;
+      }
     }
 
-    core.setOutput("decision", decision);
+    core.setOutput("decision", effectiveDecision);
+    core.setOutput("would-decision", wouldDecision);
+    core.setOutput("would_decision", wouldDecision);
     const execId =
       data.execution_id ||
       data.executionId ||
       data.receipt?.executionId ||
       "";
     core.setOutput("execution-id", execId);
+    core.setOutput("execution_id", execId);
+    const executionToken =
+      data.execution_token ||
+      data.executionToken ||
+      "";
+    if (executionToken) {
+      core.setOutput("execution-token", executionToken);
+      core.setOutput("execution_token", executionToken);
+    }
     core.setOutput("receipt", JSON.stringify(data.receipt));
     core.info("TrigGuard authorization successful");
   } catch (err) {
